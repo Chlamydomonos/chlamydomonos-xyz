@@ -1,0 +1,11 @@
+generated
+sites/*
+!sites/blog
+sites/blog/*
+!sites/blog/about.md
+!sites/blog/posts
+sites/blog/posts/*
+!sites/blog/posts/hello-world.md
+!sites/tavern-cards
+sites/tavern-cards/*
+!sites/tavern-cards/index.md

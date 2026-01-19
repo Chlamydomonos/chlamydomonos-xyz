@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "incremental": true,
+        "tsBuildInfoFile": "dist/commonjs/.tsbuildinfo",
+        "target": "es2016",
+        "module": "commonjs",
+        "rootDir": "./src",
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "outDir": "./dist/commonjs",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        "skipLibCheck": true
+    },
+    "include": ["src/**/*"],
+    "exclude": ["dist", "node_modules"]
+}

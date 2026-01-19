@@ -1,0 +1,10 @@
+{
+    "scripts": {
+        "upload": "pnpm build && cd packages/frontend && pnpm run deploy",
+        "dev": "cd packages/frontend && pnpm dev",
+        "build": "pwsh ./build.ps1",
+        "build-common-lib": "cd packages/common-lib && pnpm build",
+        "codegen": "cd packages/codegen-tool && pnpm start",
+        "blog": "pnpm codegen && cd packages/frontend && pnpm blog"
+    }
+}

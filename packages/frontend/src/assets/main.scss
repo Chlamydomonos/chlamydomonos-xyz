@@ -1,0 +1,41 @@
+@use './themes/el-light.scss' as *;
+@use './themes/el-dark.scss' as *;
+@use 'element-plus/theme-chalk/src/dark/css-vars.scss' as *;
+@use 'element-plus/theme-chalk/src/index.scss' as *;
+@use './colors.scss' as colors;
+@use './themes/site.scss' as *;
+@use './fonts.scss' as fonts;
+
+body {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--el-bg-color);
+    color: var(--el-text-color-primary);
+    font-family: fonts.$sans-serif;
+}
+
+.el-scrollbar__thumb {
+    z-index: 500;
+}
+
+a {
+    color: #40b1e0;
+    &:hover {
+        color: #60c2ea;
+    }
+    &:not(.el-link, .no-visited):visited {
+        color: #898989;
+    }
+    &.no-underline {
+        text-decoration: none;
+    }
+}
+
+code {
+    font-family: fonts.$monospace;
+}
+
+.title-font {
+    font-family: fonts.$title-font;
+}

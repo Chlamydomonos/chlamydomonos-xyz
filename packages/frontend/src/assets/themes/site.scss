@@ -1,0 +1,13 @@
+html {
+    --site-header-background: #fafdff;
+    --blog-home-header-background: #fafdffa0;
+    --cell-alive-center: #cad3e4;
+    --cell-alive-edge: #dbe2f0;
+}
+
+html.dark {
+    --site-header-background: #242a2d;
+    --blog-home-header-background: #242a2da0;
+    --cell-alive-center: #1c2834;
+    --cell-alive-edge: #161e26;
+}
