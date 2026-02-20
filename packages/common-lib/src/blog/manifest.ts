@@ -3,6 +3,7 @@ export interface FrontMatter {
     category?: string;
     tags?: string[];
     cover?: string;
+    createdAt?: number;
 }
 
 export interface PostDate {

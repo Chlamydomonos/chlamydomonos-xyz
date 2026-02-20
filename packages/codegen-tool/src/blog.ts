@@ -144,7 +144,7 @@ const main = async () => {
                     updateTime: stat.mtime,
                 },
             };
-        })
+        }),
     );
 
     // 生成所有 PostManifest
@@ -154,28 +154,30 @@ const main = async () => {
         const relativePath = path.relative(postsDir, fileData.name);
         const fileName = path.basename(fileData.name, '.md');
 
-        const createDate = formatDate(fileData.meta.createTime);
+        const createDate = formatDate(
+            frontMatter?.createdAt ? new Date(frontMatter.createdAt) : fileData.meta.createTime,
+        );
         const updateDate = formatDate(fileData.meta.updateTime);
 
         const id = `${createDate.year}/${createDate.month}/${createDate.day}/${fileName}`;
 
         const category = frontMatter?.category ? frontMatter.category.split('/').filter((c) => c.trim()) : ['未分类'];
 
-        const tags = frontMatter?.tags || [];
+        const tags = frontMatter?.tags ?? [];
         const summary = extractSummary(text);
         const cover = extractCover(text, frontMatter?.cover);
 
         return {
             id,
             path: relativePath.replace(/\\/g, '/'),
-            title: frontMatter?.title || fileName,
+            title: frontMatter?.title ?? fileName,
             category,
             tags,
             summary,
             cover,
             createDate,
             updateDate,
-            createTimestamp: fileData.meta.createTime.getTime(),
+            createTimestamp: frontMatter?.createdAt ?? fileData.meta.createTime.getTime(),
         };
     });
 
