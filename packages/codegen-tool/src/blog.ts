@@ -79,7 +79,22 @@ const getRandomCover = (posts: PostManifestWithTimestamp[]): string | undefined 
         return undefined;
     }
     const randomIndex = Math.floor(Math.random() * postsWithCover.length);
-    return postsWithCover[randomIndex].cover;
+    const selected = postsWithCover[randomIndex];
+    const cover = selected.cover!;
+
+    // 如果是绝对 URL（http(s):// 或 //）或以 / 开头，直接返回
+    if (/^(https?:)?\/\//.test(cover) || cover.startsWith('/')) {
+        return cover;
+    }
+
+    // 否则将相对路径解析为相对于 sites/blog/posts 的路径
+    const postDir = path.posix.dirname(selected.path);
+    const resolved =
+        postDir === '.'
+            ? path.posix.join('/sites', 'blog', 'posts', cover)
+            : path.posix.join('/sites', 'blog', 'posts', postDir, cover);
+
+    return resolved;
 };
 
 const ensureDir = async (dir: string) => {

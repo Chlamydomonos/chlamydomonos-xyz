@@ -2,7 +2,7 @@
     <ElCard class="small-post-card" :body-style="loading ? { padding: '1rem' } : { padding: 0 }">
         <ElSkeleton :loading :throttle="100">
             <template v-if="manifest">
-                <img v-if="manifest.cover" :src="manifest.cover" class="post-cover" />
+                <img v-if="manifest.cover" :src="coverSrc" class="post-cover" />
                 <MandelbrotSet v-else :seed="id" :width="150" :height="100" :colors />
                 <div class="title-container">
                     <ElScrollbar>
@@ -19,7 +19,7 @@
 <script lang="ts" setup>
 import type { PostManifest } from 'common-lib/blog/manifest';
 import { ElCard, ElScrollbar, ElSkeleton } from 'element-plus';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import MandelbrotSet from './MandelbrotSet.vue';
 import { useMandelbrotColors } from '@/lib/blog/mandelbrot-colors';
 import { blogAxios } from '@/lib/blog/blog-axios';
@@ -42,6 +42,16 @@ const load = async () => {
 };
 
 onMounted(load);
+
+const coverSrc = computed(() => {
+    if (!manifest.value?.cover) {
+        return '';
+    }
+    const markdownPath = `/sites/blog/posts/${manifest.value.path}`;
+    const url = new URL(markdownPath, window.location.origin);
+    const imageUrl = new URL(manifest.value.cover, url.href);
+    return imageUrl.href;
+});
 </script>
 
 <style lang="scss" scoped>

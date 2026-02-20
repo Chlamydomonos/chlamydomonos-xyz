@@ -9,7 +9,7 @@
                     <template v-if="data">
                         <div class="cover-wrapper">
                             <div ref="coverContainer">
-                                <img :src="data.cover" v-if="data.cover" />
+                                <img :src="coverSrc" v-if="data.cover" />
                                 <MandelbrotSet :seed="data.id" :colors v-else :width="mandelbrotWidth" />
                             </div>
                             <div class="post-title title-font" id="main-title" ref="mainTitle">{{ postTitle }}</div>
@@ -190,7 +190,7 @@ const setupTitleObserver = () => {
         },
         {
             threshold: Array.from({ length: 101 }, (_, i) => i / 100),
-        }
+        },
     );
 
     observer.value.observe(mainTitle.value);
@@ -203,6 +203,16 @@ onBeforeUnmount(() => {
 watch(mainTitle, setupTitleObserver, { immediate: true });
 
 const { isDark } = storeToRefs(useThemeStore());
+
+const coverSrc = computed(() => {
+    if (!data.value?.cover) {
+        return '';
+    }
+    const markdownPath = `/sites/blog/posts/${data.value.path}`;
+    const url = new URL(markdownPath, window.location.origin);
+    const imageUrl = new URL(data.value.cover, url.href);
+    return imageUrl.href;
+});
 </script>
 
 <style lang="scss" scoped>
@@ -221,6 +231,9 @@ const { isDark } = storeToRefs(useThemeStore());
     position: relative;
     display: block;
     width: 100%;
+    img {
+        width: 100%;
+    }
 }
 
 .cover-wrapper img {

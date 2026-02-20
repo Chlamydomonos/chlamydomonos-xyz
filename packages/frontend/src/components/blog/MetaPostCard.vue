@@ -95,6 +95,11 @@ const colors = computed(() => {
     height: 32px;
     border-radius: 4px;
     overflow: hidden;
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
 }
 
 .separator {
