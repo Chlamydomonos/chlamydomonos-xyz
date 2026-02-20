@@ -28,7 +28,7 @@ const generatedDir = path.resolve(publicDir, 'generated', 'sites', 'blog');
 
 const POSTS_PER_PAGE = 10;
 
-type PostManifestWithTimestamp = PostManifest & { createTimestamp: number };
+type PostManifestWithTimestamp = PostManifest & { createTimestamp: number; _prevPath?: string };
 
 const sortPostsByDate = (posts: PostManifestWithTimestamp[]): PostManifestWithTimestamp[] => {
     return posts.sort((a, b) => b.createTimestamp - a.createTimestamp);
@@ -122,10 +122,10 @@ const ensureDir = async (dir: string) => {
 
 const writeJson = async (filePath: string, data: any) => {
     await ensureDir(path.dirname(filePath));
-    // 如果是PostManifestWithTimestamp，移除createTimestamp字段
+    // 移除内部处理用的临时字段
     let dataToWrite = data;
-    if (data && typeof data === 'object' && 'createTimestamp' in data) {
-        const { createTimestamp, ...rest } = data;
+    if (data && typeof data === 'object') {
+        const { createTimestamp, _prevPath, ...rest } = data as any;
         dataToWrite = rest;
     }
     await fs.promises.writeFile(filePath, JSON.stringify(dataToWrite, null, 2), 'utf-8');
@@ -199,6 +199,14 @@ const main = async () => {
         const summary = extractSummary(text);
         const cover = extractCover(text, frontMatter?.cover);
 
+        // 解析 prev 路径（相对于 postsDir）
+        let _prevPath: string | undefined;
+        if (frontMatter?.prev) {
+            const postFileDir = path.dirname(fileData.name);
+            const resolvedAbsolute = path.resolve(postFileDir, frontMatter.prev);
+            _prevPath = path.relative(postsDir, resolvedAbsolute).replace(/\\/g, '/');
+        }
+
         return {
             id,
             path: relativePath.replace(/\\/g, '/'),
@@ -210,11 +218,24 @@ const main = async () => {
             createDate,
             updateDate,
             createTimestamp: frontMatter?.createdAt ?? fileData.meta.createTime.getTime(),
+            _prevPath,
         };
     });
 
     // 按创建时间倒序排序
     postManifests.sort((a, b) => b.createTimestamp - a.createTimestamp);
+
+    // 根据 front matter 中的 prev 字段构建 prev/next 关联
+    const pathToPost = new Map(postManifests.map((p) => [p.path, p]));
+    for (const post of postManifests) {
+        if (post._prevPath) {
+            const prevPost = pathToPost.get(post._prevPath);
+            if (prevPost) {
+                post.prev = prevPost.id;
+                prevPost.next = post.id;
+            }
+        }
+    }
 
     console.log(`Generated ${postManifests.length} post manifests`);
 

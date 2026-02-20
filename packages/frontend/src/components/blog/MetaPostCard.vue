@@ -8,7 +8,7 @@
         </div>
         <div class="separator"></div>
         <div class="title">
-            <RouterLink :to="`/posts/${post.id}`">{{ post.title }}</RouterLink>
+            <RouterLink :to="`/blog/posts/${post.id}`">{{ post.title }}</RouterLink>
         </div>
     </div>
 </template>

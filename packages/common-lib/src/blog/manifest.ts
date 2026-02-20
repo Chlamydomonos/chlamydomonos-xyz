@@ -4,6 +4,7 @@ export interface FrontMatter {
     tags?: string[];
     cover?: string;
     createdAt?: number;
+    prev?: string; // 相对当前Markdown文件所在目录的上一篇文章路径
 }
 
 export interface PostDate {
@@ -22,6 +23,8 @@ export interface PostManifest {
     cover?: string; // 如果帖子front matter中指定了cover，则为该值，否则，为帖子中第一幅图片的路径（通过搜索markdown图片标签找到），如果帖子中没有图片，则留空。
     createDate: PostDate;
     updateDate: PostDate;
+    prev?: string; // 上一篇文章的id
+    next?: string; // 下一篇文章的id
 }
 
 export interface IndexManifest {

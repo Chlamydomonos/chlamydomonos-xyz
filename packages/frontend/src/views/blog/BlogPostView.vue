@@ -69,6 +69,14 @@
             <div class="links-container">
                 <a class="link-h0" href="#main-title">{{ postTitle }}</a>
             </div>
+            <div class="chain-container" v-if="data?.prev || data?.next">
+                <RouterLink class="no-visited no-underline" v-if="data.prev" :to="`/blog/posts/${data.prev}`">
+                    <FontAwesomeIcon :icon="faAngleLeft" />上一篇
+                </RouterLink>
+                <RouterLink class="no-visited no-underline" v-if="data.next" :to="`/blog/posts/${data.next}`">
+                    下一篇<FontAwesomeIcon :icon="faAngleRight" />
+                </RouterLink>
+            </div>
             <div class="links-container">
                 <template v-if="headings.length > 0">
                     <a
@@ -102,6 +110,8 @@ import { useRoute } from 'vue-router';
 import Giscus from '@giscus/vue';
 import { storeToRefs } from 'pinia';
 import { useThemeStore } from '@/stores/theme';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { faAngleLeft, faAngleRight } from '@fortawesome/free-solid-svg-icons';
 
 const props = defineProps<{ id: string }>();
 
@@ -355,5 +365,24 @@ const coverSrc = computed(() => {
     margin: 1rem 4px 4px 4px;
     border-radius: 4px;
     border: 1px solid var(--el-border-color);
+}
+
+.chain-container {
+    display: flex;
+    border-top: 1px solid var(--el-border-color);
+    border-bottom: 1px solid var(--el-border-color);
+    a {
+        text-align: center;
+        line-height: 2em;
+        padding: 0.5em;
+        flex-grow: 1;
+        color: var(--el-text-color-regular);
+        &:not(:last-child) {
+            border-right: 1px solid var(--el-border-color);
+        }
+        &:hover {
+            color: var(--el-text-color-primary);
+        }
+    }
 }
 </style>

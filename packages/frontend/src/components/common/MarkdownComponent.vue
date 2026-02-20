@@ -10,7 +10,7 @@
 
 <script lang="ts" setup>
 import { ElSkeleton } from 'element-plus';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { parseMarkdownFrontMatter } from 'common-lib/markdown-front-matter';
 import kramedRaw from 'kramed';
 import axios from 'axios';
@@ -120,7 +120,7 @@ const createRenderer = (isTextMode: boolean) => {
     return renderer;
 };
 
-onMounted(async () => {
+const render = async () => {
     const errorHtml = '<span style="color: red">Error</span>';
 
     if (!(window as any).MathJax) {
@@ -185,7 +185,11 @@ onMounted(async () => {
         htmlText.value = errorHtml;
         loading.value = false;
     }
-});
+};
+
+onMounted(render);
+
+watch(props, render);
 </script>
 
 <style lang="scss">
