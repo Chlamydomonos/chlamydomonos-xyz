@@ -73,12 +73,29 @@ const extractCover = (text: string, frontMatterCover?: string): string | undefin
     return match ? match[1] : undefined;
 };
 
+const hashPosts = (posts: PostManifestWithTimestamp[]): number => {
+    const str = posts.map((p) => p.id).join('|');
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
+    }
+    return hash >>> 0;
+};
+
+const seededRandom = (seed: number): number => {
+    let s = (seed + 0x6d2b79f5) | 0;
+    s = Math.imul(s ^ (s >>> 15), 1 | s);
+    s = (s + Math.imul(s ^ (s >>> 7), 61 | s)) ^ s;
+    return ((s ^ (s >>> 14)) >>> 0) / 4294967296;
+};
+
 const getRandomCover = (posts: PostManifestWithTimestamp[]): string | undefined => {
     const postsWithCover = posts.filter((p) => p.cover);
     if (postsWithCover.length === 0) {
         return undefined;
     }
-    const randomIndex = Math.floor(Math.random() * postsWithCover.length);
+    const seed = hashPosts(postsWithCover);
+    const randomIndex = Math.floor(seededRandom(seed) * postsWithCover.length);
     const selected = postsWithCover[randomIndex];
     const cover = selected.cover!;
 
