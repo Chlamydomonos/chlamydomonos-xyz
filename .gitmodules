@@ -1,0 +1,3 @@
+[submodule "packages/frontend/public/sites/blog"]
+	path = packages/frontend/public/sites/blog
+	url = https://github.com/Chlamydomonos/blog-source.git
