@@ -15,6 +15,7 @@ import { parseMarkdownFrontMatter } from 'common-lib/markdown-front-matter';
 import kramedRaw from 'kramed';
 import axios from 'axios';
 import hljs from 'highlight.js';
+import { preprocessMarkdown } from '@/lib/preprocess-markdown';
 
 // @types/kramed有问题，只能这样解决
 const kramed = kramedRaw as unknown as import('kramed').KramedStatic;
@@ -156,6 +157,8 @@ onMounted(async () => {
 
         // 发送frontMatter事件
         emit('frontMatter', parsed.frontMatter);
+
+        parsed.text = await preprocessMarkdown(parsed.text);
 
         // 保护数学公式
         const { textWithPlaceholders, mathPlaceholders } = protectMathFormulas(parsed.text);
