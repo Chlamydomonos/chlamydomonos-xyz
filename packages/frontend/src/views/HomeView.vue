@@ -3,9 +3,11 @@
         <span>Chlamyd</span><ChLogo /><span>monos</span><ChBlue>.xyz</ChBlue>
     </main>
     <div class="links-container">
-        <RouterLink class="no-visited" to="/tavern-cards">角色卡发布页</RouterLink>
-        <RouterLink class="no-visited" to="/hash-lang">哈希语</RouterLink>
         <RouterLink class="no-visited" to="/blog"><ChLogo ch-char />的博客</RouterLink>
+        <EasterEgg cheat-code="tavern">
+            <RouterLink class="no-visited" to="/tavern-cards">角色卡发布页</RouterLink>
+        </EasterEgg>
+        <RouterLink class="no-visited" to="/hash-lang">哈希语</RouterLink>
     </div>
     <ThemeSwitch class="main-theme-switch" />
 </template>
@@ -13,6 +15,7 @@
 <script setup lang="ts">
 import ChBlue from '@/components/common/ChBlue.vue';
 import ChLogo from '@/components/common/ChLogo.vue';
+import EasterEgg from '@/components/common/EasterEgg.vue';
 import ThemeSwitch from '@/components/common/ThemeSwitch.vue';
 import { useTitle } from '@/lib/use-title';
 
