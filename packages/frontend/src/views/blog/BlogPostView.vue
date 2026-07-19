@@ -1,7 +1,9 @@
 <template>
     <BlogBaseLayout>
         <template #header>
-            <span class="post-header-title title-font" :style="{ opacity: headerOpacity }">{{ postTitle }}</span>
+            <span class="post-header-title title-font" :style="{ opacity: headerOpacity }" @click="scrollToTitle">
+                {{ postTitle }}
+            </span>
         </template>
         <template #default>
             <ElCard class="main-card" :body-style="{ padding: loading ? '1rem' : '0' }">
@@ -131,12 +133,15 @@ const load = async () => {
     }
 };
 
+const scrollToTitle = () => {
+    mainTitle.value?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+};
+
 const onFinishLoad = () => {
     if (route.hash && route.hash != '') {
         document.getElementById(route.hash.slice(1))?.scrollIntoView();
     } else {
-        // 无 hash 直接进入 post 页面时，将标题滚动到视图中，并尽量贴近视口底部
-        mainTitle.value?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        scrollToTitle();
     }
 };
 
