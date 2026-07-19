@@ -86,6 +86,39 @@ const extractHeadings = (html: string) => {
     return headings;
 };
 
+// 如果markdown中没有 <!-- more --> 注释，则在前三个可显示段落后插入id=more的占位注释，
+// 与 codegen-tool/src/blog.ts 中 extractSummary 的段落判定保持一致
+const ensureMoreMarker = (text: string) => {
+    if (text.indexOf('<!-- more -->') !== -1) {
+        return text;
+    }
+
+    const paragraphs: string[] = [];
+    const sections = text.split(/\n\s*\n/);
+
+    for (const section of sections) {
+        const trimmed = section.trim();
+        if (trimmed && !trimmed.startsWith('```')) {
+            paragraphs.push(trimmed);
+            if (paragraphs.length >= 3) break;
+        }
+    }
+
+    if (paragraphs.length < 3) {
+        return text;
+    }
+
+    // 在第 3 个段落之后插入 more 标记，查找该段落的结尾位置
+    const lastParagraph = paragraphs[paragraphs.length - 1];
+    const lastParagraphIndex = text.lastIndexOf(lastParagraph);
+    if (lastParagraphIndex === -1) {
+        return text;
+    }
+    const insertPos = lastParagraphIndex + lastParagraph.length;
+
+    return `${text.slice(0, insertPos)}\n\n<!-- more -->\n${text.slice(insertPos)}`;
+};
+
 // 创建 kramed renderer
 const createRenderer = (isTextMode: boolean) => {
     const renderer = new kramed.Renderer();
@@ -159,6 +192,9 @@ const render = async () => {
         emit('frontMatter', parsed.frontMatter);
 
         parsed.text = await preprocessMarkdown(parsed.text);
+
+        // 若没有显式 more 标记，则补充一个，让 MathJax/kramed 配合生成 #more 锚点
+        parsed.text = ensureMoreMarker(parsed.text);
 
         // 保护数学公式
         const { textWithPlaceholders, mathPlaceholders } = protectMathFormulas(parsed.text);
