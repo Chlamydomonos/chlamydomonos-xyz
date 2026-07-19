@@ -49,10 +49,10 @@
                         <div class="comment-container">
                             <Giscus
                                 id="comments"
-                                repo="Chlamydomonos/blog-comments"
-                                repo-id="MDEwOlJlcG9zaXRvcnkzNjM2MjM1Njk="
+                                repo="Chlamydomonos/blog-source"
+                                repo-id="R_kgDORS93lg"
                                 category="Announcements"
-                                category-id="DIC_kwDOFax0kc4C0mlf"
+                                category-id="DIC_kwDORS93ls4DBgNh"
                                 mapping="specific"
                                 :term="id"
                                 strict="0"
@@ -90,7 +90,7 @@
                         {{ heading.content }}
                     </a>
                 </template>
-                <template v-else>暂无标题</template>
+                <template v-else><span class="none">暂无标题</span></template>
             </div>
         </template>
     </BlogBaseLayout>
@@ -392,5 +392,9 @@ const coverSrc = computed(() => {
             color: var(--el-text-color-primary);
         }
     }
+}
+
+.none {
+    color: var(--el-color-info);
 }
 </style>
