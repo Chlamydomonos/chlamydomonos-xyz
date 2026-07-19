@@ -14,9 +14,8 @@
 </template>
 
 <script lang="ts" setup>
-import { useThemeStore } from '@/stores/theme';
 import type { PostManifest } from 'common-lib/blog/manifest';
-import { storeToRefs } from 'pinia';
+import { useMandelbrotColors } from '@/lib/blog/mandelbrot-colors';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MandelbrotSet from './MandelbrotSet.vue';
 
@@ -63,19 +62,7 @@ onBeforeUnmount(() => {
     }
 });
 
-const { isDark } = storeToRefs(useThemeStore());
-const colors = computed(() => {
-    if (isDark.value) {
-        return [
-            { r: 200, g: 220, b: 240 },
-            { r: 16, g: 24, b: 32 },
-        ];
-    }
-    return [
-        { r: 16, g: 24, b: 32 },
-        { r: 200, g: 220, b: 240 },
-    ];
-});
+const colors = useMandelbrotColors();
 </script>
 
 <style lang="scss" scoped>

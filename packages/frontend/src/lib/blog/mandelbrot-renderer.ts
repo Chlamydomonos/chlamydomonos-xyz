@@ -16,6 +16,7 @@ interface RenderOptions {
     colorScheme: RGB[]; // 配色方案
     seed: string; // 随机种子
     iterations: number; // 迭代次数
+    insideColor?: RGB; // 集合内颜色，默认黑色
 }
 
 /**
@@ -71,6 +72,7 @@ class MandelbrotRenderer {
         maxIterations: WebGLUniformLocation | null;
         colorPalette: WebGLUniformLocation | null;
         paletteSize: WebGLUniformLocation | null;
+        insideColor: WebGLUniformLocation | null;
     };
 
     private readonly vertexShaderSource = `
@@ -90,6 +92,7 @@ class MandelbrotRenderer {
         uniform int u_maxIterations;
         uniform vec3 u_colorPalette[32];
         uniform int u_paletteSize;
+        uniform vec3 u_insideColor;
 
         // 通过循环获取调色板颜色（避免动态索引）
         vec3 getPaletteColor(int index) {
@@ -145,7 +148,7 @@ class MandelbrotRenderer {
             }
 
             if (iterations >= u_maxIterations) {
-                gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                gl_FragColor = vec4(u_insideColor, 1.0);
             } else {
                 float log_zn = log(dot(z, z)) / 2.0;
                 float nu = log(log_zn / log(2.0)) / log(2.0);
@@ -177,6 +180,7 @@ class MandelbrotRenderer {
             maxIterations: gl.getUniformLocation(this.program, 'u_maxIterations'),
             colorPalette: gl.getUniformLocation(this.program, 'u_colorPalette'),
             paletteSize: gl.getUniformLocation(this.program, 'u_paletteSize'),
+            insideColor: gl.getUniformLocation(this.program, 'u_insideColor'),
         };
     }
 
@@ -261,7 +265,7 @@ class MandelbrotRenderer {
         cy: number,
         radius: number,
         rng: SeededRandom,
-        samples: number = 20
+        samples: number = 20,
     ): number {
         const iterations: number[] = [];
         let hasBlack = false;
@@ -387,7 +391,8 @@ class MandelbrotRenderer {
         centerY: number,
         zoom: number,
         iterations: number,
-        colorScheme: RGB[]
+        colorScheme: RGB[],
+        insideColor: RGB,
     ): void {
         const gl = this.gl;
 
@@ -398,6 +403,7 @@ class MandelbrotRenderer {
         gl.uniform2f(this.uniforms.center, centerX, centerY);
         gl.uniform1f(this.uniforms.zoom, zoom);
         gl.uniform1i(this.uniforms.maxIterations, iterations);
+        gl.uniform3f(this.uniforms.insideColor, insideColor.r / 255, insideColor.g / 255, insideColor.b / 255);
 
         const paletteSize = Math.min(colorScheme.length, 32);
         const paletteData: number[] = [];
@@ -417,7 +423,7 @@ class MandelbrotRenderer {
     }
 
     public render(canvas: HTMLCanvasElement, options: RenderOptions): void {
-        const { colorScheme, seed, iterations } = options;
+        const { colorScheme, seed, iterations, insideColor } = options;
 
         if (!colorScheme || colorScheme.length === 0) {
             throw new Error('Color scheme must contain at least one color');
@@ -427,8 +433,9 @@ class MandelbrotRenderer {
         }
 
         const location = this.findInterestingLocation(seed);
+        const inside = insideColor ?? { r: 0, g: 0, b: 0 };
 
-        this.renderToOffscreen(location.x, location.y, location.zoom, iterations, colorScheme);
+        this.renderToOffscreen(location.x, location.y, location.zoom, iterations, colorScheme, inside);
 
         this.copyToCanvas(canvas);
     }
@@ -474,13 +481,15 @@ class MandelbrotRenderer {
         centerY: number,
         zoom: number,
         iterations: number,
-        colorScheme: RGB[]
+        colorScheme: RGB[],
+        insideColor?: RGB,
     ): void {
         if (!colorScheme || colorScheme.length === 0) {
             throw new Error('Color scheme must contain at least one color');
         }
 
-        this.renderToOffscreen(centerX, centerY, zoom, iterations, colorScheme);
+        const inside = insideColor ?? { r: 0, g: 0, b: 0 };
+        this.renderToOffscreen(centerX, centerY, zoom, iterations, colorScheme, inside);
         this.copyToCanvas(canvas);
     }
 }

@@ -9,14 +9,17 @@ import { ref, computed, watch, onMounted } from 'vue';
 interface Props {
     width?: number;
     height?: number;
-    colors?: RGB[];
+    colors?: {
+        colors: RGB[];
+        insideColor?: RGB;
+    };
     seed?: string;
     iterations?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     width: 800,
-    colors: () => [],
+    colors: () => ({ colors: [], insideColor: undefined }),
     seed: 'default',
     iterations: 1000,
 });
@@ -74,9 +77,10 @@ const renderQueue = RenderQueue.getInstance();
 const render = () => {
     if (!canvasRef.value) return;
     MandelbrotRenderer.getInstance().render(canvasRef.value, {
-        colorScheme: props.colors,
+        colorScheme: props.colors.colors,
         iterations: props.iterations,
         seed: props.seed,
+        insideColor: props.colors.insideColor,
     });
 };
 
