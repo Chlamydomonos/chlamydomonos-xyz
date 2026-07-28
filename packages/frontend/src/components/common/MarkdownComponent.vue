@@ -295,11 +295,7 @@ const createRenderer = (isTextMode: boolean) => {
 const render = async () => {
     const errorHtml = '<span style="color: red">Error</span>';
 
-    await loadMathjax();
-
     try {
-        (window as any).MathJax.typesetClear();
-
         let markdownText: string;
         let parsed: { text: string; frontMatter?: Record<string, any> };
 
@@ -336,6 +332,14 @@ const render = async () => {
         // 保护数学公式
         const { textWithPlaceholders, mathPlaceholders } = protectMathFormulas(parsed.text);
 
+        if (mathPlaceholders.length > 0) {
+            await loadMathjax();
+        }
+
+        if ((window as any).MathJax && (window as any).MathJax.typesetClear) {
+            (window as any).MathJax.typesetClear();
+        }
+
         // 创建renderer
         const renderer = createRenderer(!!props.text);
 
@@ -356,10 +360,10 @@ const render = async () => {
             textContainer.value.innerHTML = html;
         }
 
-        console.log('BEFORE MATHJAX TYPESET');
-        console.log('TYPESET FUNC:', (window as any).MathJax.typesetPromise);
-        await (window as any).MathJax.typesetPromise([textContainer.value]);
-        console.log('AFTER MATHJAX TYPESET');
+        if ((window as any).MathJax && (window as any).MathJax.typesetPromise && mathPlaceholders.length > 0) {
+            await (window as any).MathJax.typesetPromise([textContainer.value]);
+        }
+
         // MathJax 完成后再渲染 mermaid：mermaid 源码可能含 $ 符号，
         // 必须避开 MathJax 的 typeset，故在它之后处理占位节点
         await renderMermaidBlocks();
