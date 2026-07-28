@@ -2,7 +2,7 @@
     <div>
         <ElSkeleton :rows="skeletonRows" :throttle="startTime" :loading="loading">
             <template #default>
-                <div class="markdown-text" v-html="htmlText"></div>
+                <div ref="textContainer" class="markdown-text"></div>
             </template>
         </ElSkeleton>
     </div>
@@ -10,7 +10,7 @@
 
 <script lang="ts" setup>
 import { ElSkeleton } from 'element-plus';
-import { onMounted, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { parseMarkdownFrontMatter } from 'common-lib/markdown-front-matter';
 import kramedRaw from 'kramed';
@@ -18,6 +18,7 @@ import axios from 'axios';
 import hljs from 'highlight.js';
 import { preprocessMarkdown } from '@/lib/preprocess-markdown';
 import { useThemeStore } from '@/stores/theme';
+import { loadMathjax } from '@/lib/load-mathjax';
 
 // @types/kramed有问题，只能这样解决
 const kramed = kramedRaw as unknown as import('kramed').KramedStatic;
@@ -38,7 +39,7 @@ const props = defineProps({
 });
 
 const loading = ref(true);
-const htmlText = ref('');
+const textContainer = ref<HTMLDivElement>();
 
 const themeStore = useThemeStore();
 const { isDark } = storeToRefs(themeStore);
@@ -294,16 +295,7 @@ const createRenderer = (isTextMode: boolean) => {
 const render = async () => {
     const errorHtml = '<span style="color: red">Error</span>';
 
-    if (!(window as any).MathJax) {
-        (window as any).MathJax = {
-            tex: {
-                inlineMath: { '[+]': [['$', '$']] },
-            },
-        };
-    }
-
-    // @ts-expect-error MathJax没有类型注释
-    await import('mathjax/tex-chtml.js');
+    await loadMathjax();
 
     try {
         (window as any).MathJax.typesetClear();
@@ -321,8 +313,12 @@ const render = async () => {
             markdownText = (await axios.get(props.url, { headers: { 'Content-Type': 'text/plain' } })).data;
             parsed = parseMarkdownFrontMatter(markdownText);
         } else {
-            htmlText.value = errorHtml;
             loading.value = false;
+            await nextTick();
+            if (textContainer.value) {
+                textContainer.value.innerHTML = errorHtml;
+            }
+
             return;
         }
 
@@ -353,17 +349,28 @@ const render = async () => {
         const headings = extractHeadings(html);
         emit('headings', headings);
 
-        htmlText.value = html;
         loading.value = false;
-        await (window as any).MathJax.typesetPromise();
+        await nextTick();
+
+        if (textContainer.value) {
+            textContainer.value.innerHTML = html;
+        }
+
+        console.log('BEFORE MATHJAX TYPESET');
+        console.log('TYPESET FUNC:', (window as any).MathJax.typesetPromise);
+        await (window as any).MathJax.typesetPromise([textContainer.value]);
+        console.log('AFTER MATHJAX TYPESET');
         // MathJax 完成后再渲染 mermaid：mermaid 源码可能含 $ 符号，
         // 必须避开 MathJax 的 typeset，故在它之后处理占位节点
         await renderMermaidBlocks();
         emit('finishLoad');
     } catch (e) {
         console.error(e);
-        htmlText.value = errorHtml;
         loading.value = false;
+        await nextTick();
+        if (textContainer.value) {
+            textContainer.value.innerHTML = errorHtml;
+        }
     }
 };
 
