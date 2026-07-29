@@ -284,6 +284,11 @@ const createRenderer = (isTextMode: boolean) => {
     (renderer as any).options = {
         langPrefix: '',
         highlight: (code: string, language: string) => {
+            // 未指定语言，或 highlight.js 未注册该语言时，作为纯文本渲染，
+            // 避免 hljs.highlight 抛出 "Unknown language" 错误
+            if (!language || !hljs.getLanguage(language)) {
+                return escapeHtml(code);
+            }
             const result = hljs.highlight(code, { language });
             return result.value;
         },
@@ -479,9 +484,15 @@ watch(isDark, async () => {
         background-color: #010510;
         padding: 0.25rem;
         border-radius: 4px;
+        // 单行过长时显示水平滚动条，避免溢出
+        overflow-x: auto;
+        white-space: pre;
 
         code {
             background-color: #010510;
+            // 让 code 撑满 pre 后再触发滚动而不是换行
+            white-space: pre;
+            display: block;
         }
     }
 }
