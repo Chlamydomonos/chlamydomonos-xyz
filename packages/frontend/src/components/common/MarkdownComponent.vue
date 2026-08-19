@@ -444,6 +444,9 @@ watch(isDark, async () => {
     }
 
     img {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
         border-radius: 4px;
         max-width: 100%;
     }
@@ -476,6 +479,38 @@ watch(isDark, async () => {
         margin-left: 0;
         padding-left: 1em;
         color: var(--el-text-color-secondary);
+    }
+
+    table {
+        border-collapse: collapse;
+        width: fit-content;
+        max-width: 100%;
+        margin: 1em auto;
+        overflow-x: auto;
+        display: block;
+
+        thead {
+            background-color: var(--el-fill-color-light);
+        }
+
+        th,
+        td {
+            border: 1px solid var(--el-border-color);
+            padding: 0.5em 0.75em;
+            text-align: left;
+        }
+
+        th {
+            font-weight: 600;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: var(--el-fill-color-lighter);
+        }
+
+        tbody tr:hover {
+            background-color: var(--el-fill-color);
+        }
     }
 
     pre {
