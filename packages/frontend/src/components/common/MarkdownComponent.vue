@@ -3,6 +3,13 @@
         <ElSkeleton :rows="skeletonRows" :throttle="startTime" :loading="loading">
             <template #default>
                 <div ref="textContainer" class="markdown-text"></div>
+                <!-- 宏子组件：通过 Teleport 注入上方 v-html 生成的占位元素中 -->
+                <component
+                    v-for="instance in macroComponents"
+                    :key="instance.key"
+                    :is="instance.component"
+                    v-bind="instance.props"
+                />
             </template>
         </ElSkeleton>
     </div>
@@ -10,7 +17,7 @@
 
 <script lang="ts" setup>
 import { ElSkeleton } from 'element-plus';
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, shallowRef, watch, type Component } from 'vue';
 import { storeToRefs } from 'pinia';
 import { parseMarkdownFrontMatter } from 'common-lib/markdown-front-matter';
 import kramedRaw from 'kramed';
@@ -18,12 +25,18 @@ import axios from 'axios';
 import hljs from 'highlight.js';
 import { preprocessMarkdown } from '@/lib/preprocess-markdown';
 import { useThemeStore } from '@/stores/theme';
-import { loadMathjax } from '@/lib/load-mathjax';
+import { getMacroComponentRegistrations } from '@/lib/markdown-macro-components';
+import {
+    resetMermaidPlaceholders,
+    renderMermaidCode,
+    renderMermaidBlocks,
+    rerenderMermaidOnThemeChange,
+} from '@/lib/markdown-mermaid';
+import { protectMathFormulas, restoreMathFormulas, typesetMath } from '@/lib/markdown-mathjax';
+import { escapeHtml } from '@/lib/markdown-html';
 
 // @types/kramed有问题，只能这样解决
 const kramed = kramedRaw as unknown as import('kramed').KramedStatic;
-
-type MermaidModule = typeof import('mermaid');
 
 const props = defineProps({
     text: { type: String },
@@ -50,146 +63,56 @@ const emit = defineEmits<{
     finishLoad: [];
 }>();
 
-// ===== Mermaid =====
-// 动态加载的 mermaid 模块，与 MathJax 一样懒加载，避免污染主 bundle
-let mermaidModule: MermaidModule | null = null;
-let mermaidLoadFailed = false;
-// 每次渲染使用递增的 id 前缀，避免多篇文档/多次渲染发生 id 冲突
-let mermaidRenderSeq = 0;
-// 经 kramed 处理后，所有 mermaid 占位容器的 id 列表，供 renderMermaidBlocks 使用
-let pendingMermaidIds: string[] = [];
+// ===== 宏子组件 =====
+// 宏（如 video）展开时只生成占位元素（此时无法得知 markdown 文档的 URL），
+// 并通过 registerMacroComponent 注册对应的子组件。
+// 渲染完成后在这里按注册表统一扫描占位元素、解析 props，
+// 并通过 Teleport 将子组件注入占位元素中。
+// 子组件是本组件的子组件：innerHTML 赋值后占位元素已同步存在于 DOM 中，
+// 先填充 macroComponents 数组，再 await nextTick() 等待一帧，Teleport 即可找到目标元素。
+// 子组件随组件树自动卸载，无需手动管理实例。
+interface MacroComponentInstance {
+    key: string;
+    component: Component;
+    props: Record<string, unknown>;
+}
 
-const loadMermaid = async (): Promise<MermaidModule | null> => {
-    if (mermaidModule) return mermaidModule;
-    if (mermaidLoadFailed) return null;
-    try {
-        mermaidModule = await import('mermaid');
-        return mermaidModule;
-    } catch (e) {
-        console.error('[MarkdownComponent] 加载 mermaid 失败', e);
-        mermaidLoadFailed = true;
-        return null;
-    }
-};
+const macroComponents = shallowRef<MacroComponentInstance[]>([]);
+let macroComponentSeq = 0;
 
-const currentMermaidTheme = () => {
-    return themeStore.isDark ? 'dark' : 'default';
-};
-
-// 初始化（若已初始化过同主题则跳过）。mermaid 全局只能 initialize 一次，
-// 因此用 startOnLoad:false + 维护 lastTheme 决定是否需要重新渲染
-let lastMermaidTheme: string | null = null;
-const ensureMermaidInitialized = (mod: MermaidModule) => {
-    const theme = currentMermaidTheme();
-    if (lastMermaidTheme === null) {
-        mod.default.initialize({
-            startOnLoad: false,
-            theme,
-            securityLevel: 'loose',
-            fontFamily: 'inherit',
-        });
-        lastMermaidTheme = theme;
-    } else if (lastMermaidTheme !== theme) {
-        // mermaid.initialize 在 v10+ 后要求传入 force-static generation，重新设置主题
-        mod.default.initialize({
-            startOnLoad: false,
-            theme,
-            securityLevel: 'loose',
-            fontFamily: 'inherit',
-        });
-        lastMermaidTheme = theme;
-    }
-};
-
-// 用 hljs 安全地高亮 mermaid 源码；mermaid 不是 hljs 内置语言时回退为纯文本转义
-const highlightMermaidFallback = (code: string) => {
-    try {
-        return hljs.highlight(code, { language: 'mermaid' }).value;
-    } catch {
-        return escapeHtml(code);
-    }
-};
-
-// 扫描 DOM 中所有占位容器并异步渲染。失败时回退为 hljs 高亮的原始代码
-const renderMermaidBlocks = async () => {
-    const ids = pendingMermaidIds;
-    pendingMermaidIds = [];
-    if (ids.length === 0) return;
-
-    const mod = await loadMermaid();
-    if (!mod) {
-        // 降级：用 hljs 渲染原始代码
-        for (const id of ids) {
-            const el = document.getElementById(id);
-            if (el) {
-                const raw = el.textContent ?? '';
-                el.outerHTML = `<pre><code class="hljs">${highlightMermaidFallback(raw)}</code></pre>`;
-            }
-        }
+const mountMacroComponents = async () => {
+    const registrations = getMacroComponentRegistrations();
+    if (registrations.length === 0) {
+        macroComponents.value = [];
         return;
     }
 
-    ensureMermaidInitialized(mod);
+    // shallowRef 下逐个 push 不触发响应式，先在本地构建完整数组再一次性赋值
+    const instances: MacroComponentInstance[] = [];
 
-    const base = `mmd-${mermaidRenderSeq++}`;
-    await Promise.all(
-        ids.map(async (id, idx) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            const code = el.textContent ?? '';
-            try {
-                const { svg } = await mod.default.render(`${base}-${idx}`, code);
-                // 把原始 mermaid 源码存入 data 属性，供主题切换时局部重渲染使用
-                const wrapper = document.createElement('div');
-                wrapper.className = 'mermaid-svg-wrapper';
-                wrapper.setAttribute('data-mermaid-code', code);
-                wrapper.innerHTML = svg;
-                el.replaceWith(wrapper);
-            } catch (e) {
-                console.error(`[MarkdownComponent] mermaid 渲染失败 (id=${id})`, e);
-                el.outerHTML = `<pre class="mermaid-error"><code class="hljs">${highlightMermaidFallback(code)}</code></pre>`;
+    for (const registration of registrations) {
+        const placeholders = textContainer.value?.querySelectorAll<HTMLElement>(`.${registration.placeholderClass}`);
+        if (!placeholders) {
+            continue;
+        }
+        for (const el of placeholders) {
+            const parsedProps = registration.parseProps(el);
+            if (!parsedProps) {
+                continue;
             }
-        }),
-    );
-};
+            instances.push({
+                key: `${registration.macroName}-${macroComponentSeq++}`,
+                component: registration.component,
+                // placeholderId 由机制统一附加：子组件通过 Teleport 注入自己的占位元素
+                props: { ...parsedProps, placeholderId: el.id },
+            });
+        }
+    }
 
-// 保护数学公式不被 kramed 处理
-const protectMathFormulas = (text: string) => {
-    const mathPlaceholders: string[] = [];
-    let textWithPlaceholders = text;
+    macroComponents.value = instances;
 
-    // 先替换块级公式 $$...$$
-    textWithPlaceholders = textWithPlaceholders.replace(/\$\$[\s\S]+?\$\$/g, (match) => {
-        const index = mathPlaceholders.length;
-        mathPlaceholders.push(match);
-        return `<!--MATH-BLOCK-${index}-->`;
-    });
-
-    // 再替换行内公式 $...$
-    textWithPlaceholders = textWithPlaceholders.replace(/\$[^\$\n]+?\$/g, (match) => {
-        const index = mathPlaceholders.length;
-        mathPlaceholders.push(match);
-        return `<!--MATH-INLINE-${index}-->`;
-    });
-
-    return { textWithPlaceholders, mathPlaceholders };
-};
-
-// 恢复数学公式
-const restoreMathFormulas = (html: string, mathPlaceholders: string[]) => {
-    return html.replace(/<!--MATH-(BLOCK|INLINE)-(\d+)-->/g, (_match, _type, index) => {
-        return mathPlaceholders[parseInt(index)];
-    });
-};
-
-// 转义 HTML 特殊字符，用于把 mermaid 源码安全放进占位 <pre><code> 中
-const escapeHtml = (text: string) => {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    // 等待一帧，让 Teleport 的目标占位元素先完成渲染，再实例化子组件
+    await nextTick();
 };
 
 // 从HTML中提取所有具有id的标题
@@ -244,20 +167,13 @@ const ensureMoreMarker = (text: string) => {
 const createRenderer = (isTextMode: boolean) => {
     const renderer = new kramed.Renderer();
 
-    // 代码块处理：intercept mermaid 写法，输出占位容器并登记 id，
-    // 在 render() 流程末尾通过 renderMermaidBlocks 用 mermaid 异步渲染 SVG 替换。
-    // 其余语言走原有 highlight.js 高亮逻辑。
+    // 代码块处理：mermaid 写法交给 markdown-mermaid 模块输出占位容器，
+    // 在 render() 流程末尾异步渲染 SVG 替换；其余语言走原有 highlight.js 高亮逻辑。
     const originalCode = renderer.code ?? (() => '');
     renderer.code = (code, languageParam) => {
-        // 规范化语言标签（去除首尾空白、小写），用于稳定匹配 'mermaid'
-        const language = (languageParam ?? '').trim().toLowerCase();
-        if (language === 'mermaid') {
-            // 内部缓存本轮的 id，便于后续 renderMermaidBlocks 收集
-            const id = `mermaid-placeholder-${mermaidRenderSeq}-${pendingMermaidIds.length}`;
-            pendingMermaidIds.push(id);
-            // 用 <pre><code> 包裹保留文本，renderMermaidBlocks 会读取 textContent
-            // 加 hidden 属性避免闪烁，挂载后即刻替换为 SVG
-            return `<pre id="${id}" class="mermaid-placeholder" aria-hidden="true"><code>${escapeHtml(code)}</code></pre>`;
+        const mermaidHtml = renderMermaidCode(code, languageParam);
+        if (mermaidHtml !== null) {
+            return mermaidHtml;
         }
         return originalCode.call(renderer, code, languageParam);
     };
@@ -327,7 +243,7 @@ const render = async () => {
         emit('frontMatter', parsed.frontMatter);
 
         // 每次渲染都重置 mermaid 占位 id 队列
-        pendingMermaidIds = [];
+        resetMermaidPlaceholders();
 
         parsed.text = await preprocessMarkdown(parsed.text);
 
@@ -336,14 +252,6 @@ const render = async () => {
 
         // 保护数学公式
         const { textWithPlaceholders, mathPlaceholders } = protectMathFormulas(parsed.text);
-
-        if (mathPlaceholders.length > 0) {
-            await loadMathjax();
-        }
-
-        if ((window as any).MathJax && (window as any).MathJax.typesetClear) {
-            (window as any).MathJax.typesetClear();
-        }
 
         // 创建renderer
         const renderer = createRenderer(!!props.text);
@@ -362,16 +270,22 @@ const render = async () => {
         await nextTick();
 
         if (textContainer.value) {
+            // data-markdown-url 供宏子组件解析相对路径（与图片相同的规则）
+            textContainer.value.setAttribute('data-markdown-url', props.url ?? '');
             textContainer.value.innerHTML = html;
         }
 
-        if ((window as any).MathJax && (window as any).MathJax.typesetPromise && mathPlaceholders.length > 0) {
-            await (window as any).MathJax.typesetPromise([textContainer.value]);
-        }
+        // MathJax 排版
+        await typesetMath(textContainer.value, mathPlaceholders);
 
         // MathJax 完成后再渲染 mermaid：mermaid 源码可能含 $ 符号，
         // 必须避开 MathJax 的 typeset，故在它之后处理占位节点
         await renderMermaidBlocks();
+
+        // 最后挂载宏子组件：占位元素已随 innerHTML 写入 DOM，
+        // 按注册表解析 props 后，通过 Teleport 注入子组件
+        await mountMacroComponents();
+
         emit('finishLoad');
     } catch (e) {
         console.error(e);
@@ -388,26 +302,7 @@ onMounted(render);
 watch(props, render);
 
 // 主题切换时，仅对已挂载的 mermaid SVG 容器做局部重渲染，避免整篇重跑 kramed+MathJax
-watch(isDark, async () => {
-    const wrappers = document.querySelectorAll<HTMLElement>('.mermaid-svg-wrapper');
-    if (wrappers.length === 0) return;
-
-    const mod = await loadMermaid();
-    if (!mod) return;
-    ensureMermaidInitialized(mod);
-
-    const base = `mmd-theme-${mermaidRenderSeq++}`;
-    wrappers.forEach(async (el, idx) => {
-        const code = el.getAttribute('data-mermaid-code') ?? '';
-        if (!code) return;
-        try {
-            const { svg } = await mod.default.render(`${base}-${idx}`, code);
-            el.innerHTML = svg;
-        } catch (e) {
-            console.error('[MarkdownComponent] 主题切换 mermaid 重渲染失败', e);
-        }
-    });
-});
+watch(isDark, rerenderMermaidOnThemeChange);
 </script>
 
 <style lang="scss">
